@@ -104,7 +104,6 @@ public class Mallory {
 					switch (line) {
 						case "1":
 							System.out.println("Passing message along to Bob");
-							// Pass message along to Bob
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
 							break;
@@ -112,12 +111,12 @@ public class Mallory {
 							System.out.println("Dropping message from Alice");
 							break;
 						case "3":
-							System.out.println("Message modified, sending two copies instead!"); 
+							System.out.println("Message modified! I'm sending two copies instead"); 
 							streamOut.writeUTF(packagedMsg + packagedMsg);
 							streamOut.flush();					
 							break;
 						default: 
-							System.out.println("Defaulting to passing the original message to Bob");
+							System.out.println("Illegal argument! Passing the original message to Bob");
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
 					}

@@ -22,14 +22,16 @@ import javax.crypto.spec.SecretKeySpec;
 public class Alice {
 
 	// Constants for RSA keys
-	private static String PUBLIC_KEY_PATH = "alicePublic.pub";
-	private static String PRIVATE_KEY_PATH = "alicePrivate.key";
-	private static String PUBLIC_KEY_FORMAT = "X.509";
-	private static String PRIVATE_KEY_FORMAT = "PKCS#8";
+	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
+	private static final String ALICE_PRIVATE_KEY_PATH = "alicePrivate.key";
+	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
+	private static final String PUBLIC_KEY_FORMAT = "X.509";
+	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
 	//RSA keys 
-	private PrivateKey privateKey;
-	private PublicKey publicKey;
+	private PrivateKey alicePrivateKey;
+	private PublicKey alicePublicKey;
+	private PublicKey bobPublicKey;
 
     // instance variables
     private boolean mac;
@@ -103,23 +105,32 @@ public class Alice {
 		
 	private void readKeys() {
 		try {
-			/* Read all bytes from the private key file */
-			Path path = Paths.get(PRIVATE_KEY_PATH);
+			/* Read all bytes from Alice's private key file */
+			Path path = Paths.get(ALICE_PRIVATE_KEY_PATH);
 			byte[] bytes = Files.readAllBytes(path);
 
-			/* Generate private key. */
+			/* Generate Alice's private key. */
 			PKCS8EncodedKeySpec ks1 = new PKCS8EncodedKeySpec(bytes);
 			KeyFactory kf = KeyFactory.getInstance("RSA");
-			privateKey = kf.generatePrivate(ks1);
+			alicePrivateKey = kf.generatePrivate(ks1);
 
-			/* Read all the public key bytes */
-			path = Paths.get(PUBLIC_KEY_PATH);
+			/* Read all Alice's public key bytes */
+			path = Paths.get(ALICE_PUBLIC_KEY_PATH);
 			bytes = Files.readAllBytes(path);
 
-			/* Generate public key. */
+			/* Generate Alice's public key. */
 			X509EncodedKeySpec ks2 = new X509EncodedKeySpec(bytes);
 			kf = KeyFactory.getInstance("RSA");
-			publicKey = kf.generatePublic(ks2);
+			alicePublicKey = kf.generatePublic(ks2);
+
+			/* Read all Bob's public key bytes */
+			path = Paths.get(BOB_PUBLIC_KEY_PATH);
+			bytes = Files.readAllBytes(path);
+
+			/* Generate Bob's public key. */
+			X509EncodedKeySpec ks3 = new X509EncodedKeySpec(bytes);
+			kf = KeyFactory.getInstance("RSA");
+			bobPublicKey = kf.generatePublic(ks3);
 		}
 		catch (IOException e) {
 			System.out.println(e.getMessage());
