@@ -1,3 +1,5 @@
+Project by Jack Bernstein & Adam Lininger-White
+
 To run this code:
 
 1. Compile the java code
