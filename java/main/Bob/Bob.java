@@ -7,6 +7,7 @@ import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -65,6 +66,13 @@ public class Bob {
 		// Read in RSA keys 
 		readKeys();
 
+		// Check that keys are read correctly 
+		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
+		// System.out.println("--------------------------------------------------------");
+		// System.out.println("Bob's Private Key: " + keyToString(bobPrivateKey));
+		// System.out.println("--------------------------------------------------------");	
+		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
+
 		//notify the identity of the server to the user
 		System.out.println("This is Bob");
 	
@@ -109,8 +117,12 @@ public class Bob {
 			System.out.println("Error in creating the server");
 			System.out.println(e);
 		}
-    }
+	}
 	
+	private String keyToString(Key k) {
+		return encoder.encodeToString(k.getEncoded());
+	}
+
 	private void readKeys() {
 		try {
 			/* Read all bytes from Bob's private key file */

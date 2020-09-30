@@ -59,6 +59,11 @@ public class Mallory {
 		
 		// Read in RSA keys 
 		readKeys();
+
+		// Check that keys are read correctly 
+		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
+		// System.out.println("--------------------------------------------------------");
+		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
 		
 		System.out.println("This is Mallory");
 		Scanner console = new Scanner(System.in);
@@ -140,6 +145,10 @@ public class Mallory {
             System.out.println(e.getMessage());
 		}
 	}	
+
+	private String keyToString(Key k) {
+		return encoder.encodeToString(k.getEncoded());
+	}
 		
 	private void readKeys() {
 		try  {
@@ -149,18 +158,18 @@ public class Mallory {
 			byte[] bytes = Files.readAllBytes(path);
 
 			/* Generate public key. */
-			X509EncodedKeySpec ks = new X509EncodedKeySpec(bytes);
+			X509EncodedKeySpec ks1 = new X509EncodedKeySpec(bytes);
 			KeyFactory kf = KeyFactory.getInstance("RSA");
-			bobPublicKey = kf.generatePublic(ks);
+			bobPublicKey = kf.generatePublic(ks1);
 
 			// GENERATE ALICE'S PUBLIC KEY
 			/* Read all the public key bytes */
-			path = Paths.get(BOB_PUBLIC_KEY_PATH);
+			path = Paths.get(ALICE_PUBLIC_KEY_PATH);
 			bytes = Files.readAllBytes(path);
 
 			/* Generate public key. */
-			ks = new X509EncodedKeySpec(bytes);
-			bobPublicKey = kf.generatePublic(ks);
+			X509EncodedKeySpec ks2 = new X509EncodedKeySpec(bytes);
+			alicePublicKey = kf.generatePublic(ks2);
 		}
 		catch (IOException e) {
 			System.out.println(e.getMessage());

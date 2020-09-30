@@ -60,6 +60,13 @@ public class Alice {
 		// Read in RSA keys 
 		readKeys();
 
+		// Check that keys are read correctly 
+		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
+		// System.out.println("--------------------------------------------------------");
+		// System.out.println("Alice's Private Key: " + keyToString(alicePrivateKey));
+		// System.out.println("--------------------------------------------------------");	
+		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
+
 		Scanner console = new Scanner(System.in);
 		System.out.println("This is Alice"); 
 			
@@ -102,6 +109,10 @@ public class Alice {
 				System.out.println(e);
 		}
 	}	
+
+	private String keyToString(Key k) {
+		return encoder.encodeToString(k.getEncoded());
+	}
 		
 	private void readKeys() {
 		try {
