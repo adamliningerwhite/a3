@@ -141,7 +141,7 @@ public class Bob {
 	}
 
     /**
-     * args[0] ; port that Mallory will connect to
+     * args[0] ; port where Bob expects connection (from Mallory)
      * args[1] ; program configuration
      */
     public static void main(String[] args) {

@@ -18,13 +18,13 @@ public class Gen {
             Key bobPublic = bobPair.getPublic();
             Key bobPrivate = bobPair. getPrivate();
 
-            // Write private key
+            // Write Bob's private key
             String outFile = "bobPrivate";
             FileOutputStream out = new FileOutputStream(outFile + ".key");
             out.write(bobPrivate.getEncoded());
             out.close();
 
-            // Write public key
+            // Write Bob's public key
             outFile = "bobPublic";
             out = new FileOutputStream(outFile + ".pub");
             out.write(bobPublic.getEncoded());
@@ -37,18 +37,19 @@ public class Gen {
             Key alicePublic = alicePair.getPublic();
             Key alicePrivate = alicePair.getPrivate();
             
-            // Write private key
+            // Write Alice's private key
             outFile = "alicePrivate";
             out = new FileOutputStream(outFile + ".key");
             out.write(alicePrivate.getEncoded());
             out.close();
 
-            // Write public key
+            // Write Alice's public key
             outFile = "alicePublic";
             out = new FileOutputStream(outFile + ".pub");
             out.write(alicePublic.getEncoded());
             out.close();
 
+            // Get key formats
             // System.out.println("Public key format: " + alicePublic.getFormat());
             // System.out.println("Private key format: " + alicePrivate.getFormat());
 

@@ -98,7 +98,7 @@ public class Mallory {
 					history.add(incomingMsg);
 
 					System.out.println("Recieved message -- " + msg + " -- from Alice");
-					System.out.println("Commands: (1) pass message along to Bob, (2) drop the message, or (3) modify the message");
+					System.out.println("Commands: (1) pass message along to Bob, (2) drop the message, or (3) modify the message (send 2 copies)");
 
 					String line = console.nextLine();
 					switch (line) {
@@ -112,9 +112,9 @@ public class Mallory {
 							System.out.println("Dropping message from Alice");
 							break;
 						case "3":
-							System.out.println("Enter a new message to pass instead:"); 
-							line = console.nextLine();
-							
+							System.out.println("Message modified, sending two copies instead!"); 
+							streamOut.writeUTF(packagedMsg + packagedMsg);
+							streamOut.flush();					
 							break;
 						default: 
 							System.out.println("Defaulting to passing the original message to Bob");
