@@ -25,6 +25,7 @@ public class Alice {
 	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
 	private static final String ALICE_PRIVATE_KEY_PATH = "alicePrivate.key";
 	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
+	private static final String SHARED_KEY_PATH = "sharedKey.key";
 	private static final String PUBLIC_KEY_FORMAT = "X.509";
 	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
@@ -32,6 +33,7 @@ public class Alice {
 	private PrivateKey alicePrivateKey;
 	private PublicKey alicePublicKey;
 	private PublicKey bobPublicKey;
+	private Key sharedKey;
 
     // instance variables
     private boolean mac;
@@ -66,6 +68,7 @@ public class Alice {
 		// System.out.println("Alice's Private Key: " + keyToString(alicePrivateKey));
 		// System.out.println("--------------------------------------------------------");	
 		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
+		System.out.println("Shared key: " + keyToString(sharedKey));
 
 		Scanner console = new Scanner(System.in);
 		System.out.println("This is Alice"); 
@@ -142,6 +145,17 @@ public class Alice {
 			X509EncodedKeySpec ks3 = new X509EncodedKeySpec(bytes);
 			kf = KeyFactory.getInstance("RSA");
 			bobPublicKey = kf.generatePublic(ks3);
+
+
+			// --------------------------------------------------------------------------
+			// TEMPORARY: MANUALLY GENERATE AND DISTRIBUTE k 
+			
+			/* Read all shared key bytes */
+			path = Paths.get(SHARED_KEY_PATH);
+			bytes = Files.readAllBytes(path);
+
+			/* Generate shared key */
+			sharedKey = new SecretKeySpec(bytes, "AES");
 		}
 		catch (IOException e) {
 			System.out.println(e.getMessage());
