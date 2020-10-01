@@ -7,6 +7,8 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.security.spec.*;
+import java.time.LocalTime;
 import java.util.Base64;
 import java.util.Scanner;
 
@@ -18,6 +20,7 @@ import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.*;
 
 public class Alice {
 
@@ -59,7 +62,8 @@ public class Alice {
 
 		// Read in RSA keys 
 		readKeys();
-
+		byte[] genMess = genSessionMessage();
+		System.out.println(genMess);
 		// Check that keys are read correctly 
 		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
 		// System.out.println("--------------------------------------------------------");
@@ -160,6 +164,27 @@ public class Alice {
 		
 		return acc.toString();
     }
+	
+	private byte[] genSessionMessage() throws Exception {
+		String recepient = "Bob";
+		LocalTime time = LocalTime.now();
+		String sender = "Alice";
+		SecretKey sessionKey = genSessionKey();
+		String sessionString = encoder.encodeToString(sessionKey.getEncoded());
+		String encodedMessage = sender + "," + sessionString;
+		System.out.println(encodedMessage);
+		Cipher encryptionCipher = Cipher.getInstance("RSA");
+		encryptionCipher.init(Cipher.ENCRYPT_MODE, bobPublicKey);
+		encryptionCipher.update(encodedMessage.getBytes());
+		byte[] cipherText = encryptionCipher.doFinal();
+		return cipherText;
+	}
+	
+	private SecretKey genSessionKey() throws Exception {
+		KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+		keyGen.init(256);
+		return keyGen.generateKey();
+	}
     
     /**
      * args[0] ; port that Alice will connect to (Mallory's port)
