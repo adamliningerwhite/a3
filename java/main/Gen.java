@@ -5,6 +5,16 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.Key;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.KeyGeneratorSpi;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 public class Gen {
     public static void main(String[] args) {
         
@@ -53,6 +63,18 @@ public class Gen {
             // System.out.println("Public key format: " + alicePublic.getFormat());
             // System.out.println("Private key format: " + alicePrivate.getFormat());
 
+            // --------------------------------------------------------------------------
+            // TEMPORARY: MANUALLY GENERATE AND DISTRIBUTE k 
+            KeyGenerator kg = KeyGenerator.getInstance("AES");
+            kg.init(256);
+            Key sharedKey = kg.generateKey();
+            System.out.println("Shared key format: " + sharedKey.getFormat());  
+            outFile = "sharedKey";
+            out = new FileOutputStream(outFile + ".key");
+            out.write(sharedKey.getEncoded());
+            out.close();
+            
+            
         }
         catch (IOException e) {
             System.out.println("Error writing keys to files.");
