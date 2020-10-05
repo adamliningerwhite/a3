@@ -3,11 +3,15 @@ import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 import java.security.*;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.security.spec.*;
+
 import java.time.LocalTime;
 import java.util.Base64;
 import java.util.Scanner;
@@ -28,109 +32,107 @@ public class Alice {
 	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
 	private static final String ALICE_PRIVATE_KEY_PATH = "alicePrivate.key";
 	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
-	private static final String SHARED_KEY_PATH = "sharedKey.key";
 	private static final String PUBLIC_KEY_FORMAT = "X.509";
 	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
-	//RSA keys 
-	private PrivateKey alicePrivateKey;
-	private PublicKey alicePublicKey;
-	private PublicKey bobPublicKey;
-	private Key sharedKey;
+	// Keys for encryption and integrity
+	private static SecretKey sharedKey;
+	private static SecretKey macKey;
+	private static SecretKey encryptionKey;
+	
+	// RSA keys 
+	private RSAPrivateKey alicePrivateKey;
+	private RSAPublicKey alicePublicKey;
+	private RSAPublicKey bobPublicKey;
 
-    // instance variables
-    private boolean mac;
-    private boolean enc;
+	// instance variables
+	private boolean mac;
+	private boolean enc;
 
-    public Base64.Encoder encoder = Base64.getEncoder();
-    public Base64.Decoder decoder = Base64.getDecoder();
-    
-    public Alice(String malloryPort, String config) throws Exception {
+	// Utilities
+	public Base64.Encoder encoder = Base64.getEncoder();
+	public Base64.Decoder decoder = Base64.getDecoder();
 
-		//Apply configuration
-		if(config.compareTo("noCrypto") == 0){
+	public Alice(String malloryPort, String config) throws Exception {
+
+		// Apply configuration
+		if (config.compareTo("noCrypto") == 0) {
 			mac = false;
 			enc = false;
-		} else if(config.compareTo("enc") == 0){
+		} else if (config.compareTo("enc") == 0) {
 			mac = false;
 			enc = true;
-		} else if(config.compareTo("mac") == 0){
+		} else if (config.compareTo("mac") == 0) {
 			mac = true;
 			enc = false;
-		} else if(config.compareTo("EncThenMac") == 0){
+		} else if (config.compareTo("EncThenMac") == 0) {
 			mac = true;
 			enc = true;
 		}
 
-		// Read in RSA keys 
+		// Read in RSA keys
 		readKeys();
-		byte[] genMess = genSessionMessage();
-		System.out.println(genMess);
-		// Check that keys are read correctly 
-		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
-		// System.out.println("--------------------------------------------------------");
-		// System.out.println("Alice's Private Key: " + keyToString(alicePrivateKey));
-		// System.out.println("--------------------------------------------------------");	
-		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
-		System.out.println("Shared key: " + keyToString(sharedKey));
 
 		Scanner console = new Scanner(System.in);
-		System.out.println("This is Alice"); 
-			
-		//obtain server's port number and connect to it
+		System.out.println("This is Alice");
+
+		// obtain server's port number and connect to it
 		int serverPort = Integer.parseInt(malloryPort);
 		String serverAddress = "localhost";
 
-		try{
+		try {
 			Socket serverSocket = new Socket(serverAddress, serverPort);
 			System.out.println("Connected to Server Mallory");
 			DataOutputStream streamOut = new DataOutputStream(serverSocket.getOutputStream());
-				
-			//obtain the message from the user and send it to Server
-			//the communication ends when the user inputs "done"
+
+			// obtain the message from the user and send it to Server
+			// the communication ends when the user inputs "done"
 			String line = "";
 			int counter = 0;
-			while(!line.equals("done")) {
-				try {  
+			while (!line.equals("done")) {
+				try {
 					counter++;
 					System.out.print("Type message: ");
 					line = console.nextLine();
-					
+
 					String packagedMsg = packageMessage(line + ":" + counter);
 					streamOut.writeUTF(packagedMsg);
 					streamOut.flush();
 					System.out.println("Message en route to Bob");
-				} 
-				catch(IOException ioe) {  
+				} catch (IOException ioe) {
 					System.out.println("Sending error: " + ioe.getMessage());
 				}
 			}
-			//close all the sockets and console 
+			// close all the sockets and console
 			console.close();
 			streamOut.close();
 			serverSocket.close();
-		} 
-		catch(IOException e) {
-				//print error
-				System.out.println("Connection failed due to following reason");
-				System.out.println(e);
+		} catch (IOException e) {
+			// print error
+			System.out.println("Connection failed due to following reason");
+			System.out.println(e);
 		}
-	}	
-
-	private String keyToString(Key k) {
-		return encoder.encodeToString(k.getEncoded());
 	}
-		
+
+	/**
+	 * Read relevant keys from files and save them in instance variables
+	 * 
+	 * For alice, we read: 1. Her private RSA key 2. Her public RSA key 3. Bob's
+	 * public RSA key
+	 * 
+	 */
 	private void readKeys() {
 		try {
-			/* Read all bytes from Alice's private key file */
+			/* Read all by tes from Alice's private key file */
 			Path path = Paths.get(ALICE_PRIVATE_KEY_PATH);
 			byte[] bytes = Files.readAllBytes(path);
 
 			/* Generate Alice's private key. */
 			PKCS8EncodedKeySpec ks1 = new PKCS8EncodedKeySpec(bytes);
 			KeyFactory kf = KeyFactory.getInstance("RSA");
-			alicePrivateKey = kf.generatePrivate(ks1);
+			alicePrivateKey = (RSAPrivateKey) kf.generatePrivate(ks1);
+
+			// --------------------------------------------------------------------------
 
 			/* Read all Alice's public key bytes */
 			path = Paths.get(ALICE_PUBLIC_KEY_PATH);
@@ -138,8 +140,9 @@ public class Alice {
 
 			/* Generate Alice's public key. */
 			X509EncodedKeySpec ks2 = new X509EncodedKeySpec(bytes);
-			kf = KeyFactory.getInstance("RSA");
-			alicePublicKey = kf.generatePublic(ks2);
+			alicePublicKey = (RSAPublicKey) kf.generatePublic(ks2);
+
+			// --------------------------------------------------------------------------
 
 			/* Read all Bob's public key bytes */
 			path = Paths.get(BOB_PUBLIC_KEY_PATH);
@@ -147,19 +150,8 @@ public class Alice {
 
 			/* Generate Bob's public key. */
 			X509EncodedKeySpec ks3 = new X509EncodedKeySpec(bytes);
-			kf = KeyFactory.getInstance("RSA");
-			bobPublicKey = kf.generatePublic(ks3);
+			bobPublicKey = (RSAPublicKey) kf.generatePublic(ks3);
 
-
-			// --------------------------------------------------------------------------
-			// TEMPORARY: MANUALLY GENERATE AND DISTRIBUTE k 
-			
-			/* Read all shared key bytes */
-			path = Paths.get(SHARED_KEY_PATH);
-			bytes = Files.readAllBytes(path);
-
-			/* Generate shared key */
-			sharedKey = new SecretKeySpec(bytes, "AES");
 		}
 		catch (IOException e) {
 			System.out.println(e.getMessage());
@@ -179,26 +171,26 @@ public class Alice {
 		return acc.toString();
     }
 	
-	private byte[] genSessionMessage() throws Exception {
-		String recepient = "Bob";
-		LocalTime time = LocalTime.now();
-		String sender = "Alice";
-		SecretKey sessionKey = genSessionKey();
-		String sessionString = encoder.encodeToString(sessionKey.getEncoded());
-		String encodedMessage = sender + "," + sessionString;
-		System.out.println(encodedMessage);
-		Cipher encryptionCipher = Cipher.getInstance("RSA");
-		encryptionCipher.init(Cipher.ENCRYPT_MODE, bobPublicKey);
-		encryptionCipher.update(encodedMessage.getBytes());
-		byte[] cipherText = encryptionCipher.doFinal();
-		return cipherText;
-	}
+	// private byte[] genSessionMessage() throws Exception {
+	// 	String recepient = "Bob";
+	// 	LocalTime time = LocalTime.now();
+	// 	String sender = "Alice";
+	// 	SecretKey sessionKey = genSessionKey();
+	// 	String sessionString = encoder.encodeToString(sessionKey.getEncoded());
+	// 	String encodedMessage = sender + "," + sessionString;
+	// 	System.out.println(encodedMessage);
+	// 	Cipher encryptionCipher = Cipher.getInstance("RSA");
+	// 	encryptionCipher.init(Cipher.ENCRYPT_MODE, bobPublicKey);
+	// 	encryptionCipher.update(encodedMessage.getBytes());
+	// 	byte[] cipherText = encryptionCipher.doFinal();
+	// 	return cipherText;
+	// }
 	
-	private SecretKey genSessionKey() throws Exception {
-		KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-		keyGen.init(256);
-		return keyGen.generateKey();
-	}
+	// private SecretKey genSessionKey() throws Exception {
+	// 	KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+	// 	keyGen.init(256);
+	// 	return keyGen.generateKey();
+	// }
     
     /**
      * args[0] ; port that Alice will connect to (Mallory's port)

@@ -3,6 +3,7 @@ import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -10,12 +11,15 @@ import java.security.NoSuchProviderException;
 import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.Signature;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -31,20 +35,24 @@ public class Bob {
 	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
 	private static final String BOB_PRIVATE_KEY_PATH = "bobPrivate.key";
 	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
-	private static final String SHARED_KEY_PATH = "sharedKey.key";
 	private static final String PUBLIC_KEY_FORMAT = "X.509";
 	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
-	//RSA keys 
-	private PrivateKey bobPrivateKey;
-	private PublicKey bobPublicKey;
-	private PublicKey alicePublicKey;
-	private Key sharedKey;
+	// keys for encryption and integrity
+	private static SecretKey sharedKey;
+	private static SecretKey macKey;
+	private static SecretKey decodingKey;
 
-    //instance variables      
+	// RSA keys
+	private RSAPrivateKey bobPrivateKey;
+	private RSAPublicKey bobPublicKey;
+	private RSAPublicKey aliceKey;
+
+    // instance variables      
     private boolean mac;
     private boolean enc;
 
+	// utilities 
     public Base64.Encoder encoder = Base64.getEncoder();
     public Base64.Decoder decoder = Base64.getDecoder();
 
@@ -68,12 +76,6 @@ public class Bob {
 		// Read in RSA keys 
 		readKeys();
 
-		// Check that keys are read correctly 
-		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
-		// System.out.println("--------------------------------------------------------");
-		// System.out.println("Bob's Private Key: " + keyToString(bobPrivateKey));
-		// System.out.println("--------------------------------------------------------");	
-		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
 		System.out.println("Shared key: " + keyToString(sharedKey));
 
 		//notify the identity of the server to the user
@@ -126,6 +128,15 @@ public class Bob {
 		return encoder.encodeToString(k.getEncoded());
 	}
 
+	/**
+	 * Read relevant keys from files and save them in instance variables
+	 * 
+	 * For bob, we read: 
+	 * 		1. His private RSA key 
+	 * 		2. His public RSA key 
+	 * 		3. Alice's public RSA key
+	 * 
+	 */
 	private void readKeys() {
 		try {
 			/* Read all bytes from Bob's private key file */
@@ -135,7 +146,9 @@ public class Bob {
 			/* Generate Bob's private key. */
 			PKCS8EncodedKeySpec ks1 = new PKCS8EncodedKeySpec(bytes);
 			KeyFactory kf = KeyFactory.getInstance("RSA");
-			bobPrivateKey = kf.generatePrivate(ks1);
+			bobPrivateKey = (RSAPrivateKey) kf.generatePrivate(ks1);
+
+			// --------------------------------------------------------------------------
 
 			/* Read all Bob's public key bytes */
 			path = Paths.get(BOB_PUBLIC_KEY_PATH);
@@ -143,8 +156,9 @@ public class Bob {
 
 			/* Generate Bob's public key. */
 			X509EncodedKeySpec ks2 = new X509EncodedKeySpec(bytes);
-			kf = KeyFactory.getInstance("RSA");
-			bobPublicKey = kf.generatePublic(ks2);
+			bobPublicKey = (RSAPublicKey) kf.generatePublic(ks2);
+
+			// --------------------------------------------------------------------------
 
 			/* Read all Alice's public key bytes */
 			path = Paths.get(ALICE_PUBLIC_KEY_PATH);
@@ -152,19 +166,7 @@ public class Bob {
 
 			/* Generate Alice's public key. */
 			X509EncodedKeySpec ks3 = new X509EncodedKeySpec(bytes);
-			kf = KeyFactory.getInstance("RSA");
-			alicePublicKey = kf.generatePublic(ks3);
-
-
-			// --------------------------------------------------------------------------
-			// TEMPORARY: MANUALLY GENERATE AND DISTRIBUTE k 
-			
-			/* Read all shared key bytes */
-			path = Paths.get(SHARED_KEY_PATH);
-			bytes = Files.readAllBytes(path);
-
-			/* Generate shared key */
-			sharedKey = new SecretKeySpec(bytes, "AES");
+			alicePublicKey = (RSAPublicKey) kf.generatePublic(ks3);
 
 		}
 		catch (IOException e) {
