@@ -1,79 +1,73 @@
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.KeyPair;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.Key;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.KeyGenerator;
-import javax.crypto.KeyGeneratorSpi;
-import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
 public class Gen {
     public static void main(String[] args) {
         
         try {
+
             // Create a key generator for RSA keys
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-            kpg.initialize(1024);
+            kpg.initialize(1024, SecureRandom.getInstance("SHA1PRNG"));
+
+            // --------------------------------------------------------------------------
 
             // Generate Bob's public and private keys
             KeyPair bobPair = kpg.generateKeyPair();
-            Key bobPublic = bobPair.getPublic();
-            Key bobPrivate = bobPair. getPrivate();
+            PublicKey bobPublic = bobPair.getPublic();
+            PrivateKey bobPrivate = bobPair. getPrivate();
 
-            // Write Bob's private key
+            // Write Bob's private key to file
+            PKCS8EncodedKeySpec bobPrivateSpec = new PKCS8EncodedKeySpec(
+				bobPrivate.getEncoded());
             String outFile = "bobPrivate";
             FileOutputStream out = new FileOutputStream(outFile + ".key");
-            out.write(bobPrivate.getEncoded());
+            out.write(bobPrivateSpec.getEncoded());
             out.close();
 
-            // Write Bob's public key
+            // Write Bob's public key to file
+            X509EncodedKeySpec bobPublicSpec = new X509EncodedKeySpec(
+				bobPublic.getEncoded());
             outFile = "bobPublic";
-            out = new FileOutputStream(outFile + ".pub");
-            out.write(bobPublic.getEncoded());
+            out = new FileOutputStream(outFile + ".key");
+            out.write(bobPublicSpec.getEncoded());
             out.close();
 
             // --------------------------------------------------------------------------
 
             // Generate Alice's public and private keys, then write them to files
             KeyPair alicePair = kpg.generateKeyPair();
-            Key alicePublic = alicePair.getPublic();
-            Key alicePrivate = alicePair.getPrivate();
-            
-            // Write Alice's private key
+            PublicKey alicePublic = alicePair.getPublic();
+            PrivateKey alicePrivate = alicePair.getPrivate();
+        
+            // Write Alice's private key to file
+            PKCS8EncodedKeySpec alicePrivateSpec = new PKCS8EncodedKeySpec(
+				alicePrivate.getEncoded());
             outFile = "alicePrivate";
             out = new FileOutputStream(outFile + ".key");
-            out.write(alicePrivate.getEncoded());
+            out.write(alicePrivateSpec.getEncoded());
             out.close();
 
-            // Write Alice's public key
+            // Write Alice's public key to file
+            X509EncodedKeySpec alicePublicSpec = new X509EncodedKeySpec(
+				alicePublic.getEncoded());
             outFile = "alicePublic";
-            out = new FileOutputStream(outFile + ".pub");
-            out.write(alicePublic.getEncoded());
+            out = new FileOutputStream(outFile + ".key");
+            out.write(alicePublicSpec.getEncoded());
             out.close();
 
             // Get key formats
-            // System.out.println("Public key format: " + alicePublic.getFormat());
-            // System.out.println("Private key format: " + alicePrivate.getFormat());
-
-            // --------------------------------------------------------------------------
-            // TEMPORARY: MANUALLY GENERATE AND DISTRIBUTE k 
-            KeyGenerator kg = KeyGenerator.getInstance("AES");
-            kg.init(256);
-            Key sharedKey = kg.generateKey();
-            System.out.println("Shared key format: " + sharedKey.getFormat());  
-            outFile = "sharedKey";
-            out = new FileOutputStream(outFile + ".key");
-            out.write(sharedKey.getEncoded());
-            out.close();
-            
+            System.out.println("Private key format: " + alicePrivate.getFormat());
+            System.out.println("Public key format: " + alicePublic.getFormat());
             
         }
         catch (IOException e) {
