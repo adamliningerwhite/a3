@@ -33,9 +33,9 @@ import javax.crypto.spec.*;
 public class Alice {
 
 	// Constants for RSA keys
-	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
+	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.key";
 	private static final String ALICE_PRIVATE_KEY_PATH = "alicePrivate.key";
-	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
+	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.key";
 	private static final String PUBLIC_KEY_FORMAT = "X.509";
 	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
@@ -76,6 +76,10 @@ public class Alice {
 
 		// Read in RSA keys
 		readKeys();
+		
+		// Generate key transfer message to establish symmetric encryption scheme
+		String keyTransferMessage = getKeyTransferMessage();
+		// System.out.println(keyTransferMessage);
 
 		Scanner console = new Scanner(System.in);
 		System.out.println("This is Alice");
@@ -111,10 +115,8 @@ public class Alice {
 			console.close();
 			streamOut.close();
 			serverSocket.close();
-		} catch (IOException e) {
-			// print error
-			System.out.println("Connection failed due to following reason");
-			System.out.println(e);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -127,7 +129,7 @@ public class Alice {
 	 * @return
 	 * 		the string Alice sends to Bob containing the shared key for sym enc
 	 */
-	private String keyTransferMessage() {
+	private String getKeyTransferMessage() {
 		
 		String transferMessage = ""; // message we build and return
 		
@@ -159,10 +161,26 @@ public class Alice {
 			this.macKey = new SecretKeySpec(macKey, "AES");
 
 			/* Build Enc(A, kAB; K_B) piece of message */
+			String toEncryptString = A + "\n" + kAB;
+			byte[] toEncryptBytes = toEncryptString.getBytes();
+			Cipher cipher = Cipher.getInstance("RSA");
+			cipher.init(Cipher.ENCRYPT_MODE, bobPublicKey, new SecureRandom());
+			byte[] encryptedBytes = cipher.doFinal(toEncryptBytes);	
+			String encryptedString = encoder.encodeToString(encryptedBytes);		
 
+			/* Build Sign(B, tA, Enc(A,kAB; K_B); k_A) piece of message */
+			String toSignString = B + "\n" + tA + "\n" + encryptedString;
+			byte[] toSignBytes = toSignString.getBytes();
+			Signature signature = Signature.getInstance("SHA256withRSA");
+			signature.initSign(alicePrivateKey);
+			signature.update(toSignBytes);
+			byte[] signedBytes = signature.sign();
+			String signedString = encoder.encodeToString(signedBytes);
+
+			transferMessage = B + "\n" + tA + "\n" + encryptedString + "\n"  + signedString;
 		}
-		catch (NoSuchAlgorithmException e) {
-			System.out.println(e.getMessage());
+		catch (Exception e) {
+			e.printStackTrace();
 		}
 		return transferMessage;
 	}
@@ -213,7 +231,7 @@ public class Alice {
 	 */
 	private void readKeys() {
 		try {
-			/* Read all by tes from Alice's private key file */
+			/* Read all bytes from Alice's private key file */
 			Path path = Paths.get(ALICE_PRIVATE_KEY_PATH);
 			byte[] bytes = Files.readAllBytes(path);
 
@@ -260,27 +278,6 @@ public class Alice {
 		
 		return acc.toString();
     }
-	
-	// private byte[] genSessionMessage() throws Exception {
-	// 	String recepient = "Bob";
-	// 	LocalTime time = LocalTime.now();
-	// 	String sender = "Alice";
-	// 	SecretKey sessionKey = genSessionKey();
-	// 	String sessionString = encoder.encodeToString(sessionKey.getEncoded());
-	// 	String encodedMessage = sender + "," + sessionString;
-	// 	System.out.println(encodedMessage);
-	// 	Cipher encryptionCipher = Cipher.getInstance("RSA");
-	// 	encryptionCipher.init(Cipher.ENCRYPT_MODE, bobPublicKey);
-	// 	encryptionCipher.update(encodedMessage.getBytes());
-	// 	byte[] cipherText = encryptionCipher.doFinal();
-	// 	return cipherText;
-	// }
-	
-	// private SecretKey genSessionKey() throws Exception {
-	// 	KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-	// 	keyGen.init(256);
-	// 	return keyGen.generateKey();
-	// }
     
     /**
      * args[0] ; port that Alice will connect to (Mallory's port)
