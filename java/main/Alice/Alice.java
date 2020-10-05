@@ -1,4 +1,5 @@
 import java.io.*;
+import java.math.BigInteger;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,10 +11,13 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.text.SimpleDateFormat;
 import java.security.spec.*;
 
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Date;
 import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
@@ -36,9 +40,9 @@ public class Alice {
 	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
 	// Keys for encryption and integrity
-	private static SecretKey sharedKey;
-	private static SecretKey macKey;
-	private static SecretKey encryptionKey;
+	private SecretKey sharedKey;
+	private SecretKey macKey;
+	private SecretKey encryptionKey;
 	
 	// RSA keys 
 	private RSAPrivateKey alicePrivateKey;
@@ -114,11 +118,97 @@ public class Alice {
 		}
 	}
 
+
+	/**
+	 * A method to generate the message that establishes a symmetric encryption scheme
+	 * 
+	 *  A -> B: B, tA, Enc(A,kAB; K_B), Sign(B, tA, Enc(A,kAB; K_B); k_A)
+	 * 
+	 * @return
+	 * 		the string Alice sends to Bob containing the shared key for sym enc
+	 */
+	private String keyTransferMessage() {
+		
+		String transferMessage = ""; // message we build and return
+		
+		// basic pieces of message
+		String A = "Alice";
+		String B = "Bob";
+		String tA = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date(System.currentTimeMillis()));
+
+		try {
+			
+			// Generate shared key (kAB) 
+			KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+			keyGen.init(128, new SecureRandom());
+			sharedKey = keyGen.generateKey();
+
+			// Get shared key (kAB) as string 
+			String kAB = encoder.encodeToString(sharedKey.getEncoded());
+			
+			/* Hash the shared key to produce a key specifically for encryption */
+			String encyrptKeyHashString = homeMadeHash(kAB, "encrypt");
+			byte[] encryptKeyBytes = decoder.decode(encyrptKeyHashString);
+			byte[] encrpytKey = Arrays.copyOfRange(encryptKeyBytes, 0, 32); // only want first 32 bits
+			encryptionKey = new SecretKeySpec(encrpytKey, "AES");
+
+			/* Repeat this process to produce a key for mac */
+			String macKeyHashString = homeMadeHash(kAB, "mac");
+			byte[] macKeyBytes = decoder.decode(macKeyHashString);
+			byte[] macKey = Arrays.copyOfRange(macKeyBytes, 0, 32);
+			this.macKey = new SecretKeySpec(macKey, "AES");
+
+			/* Build Enc(A, kAB; K_B) piece of message */
+
+		}
+		catch (NoSuchAlgorithmException e) {
+			System.out.println(e.getMessage());
+		}
+		return transferMessage;
+	}
+
+	/**
+	 * Hashes the concatenation of parameters using SHA-512 and returns resulting String 
+	 * 
+	 * @param msg
+	 * 		body of the message we're going to hash
+	 * @param type
+	 * 		purpose of the hash (encrpytion or mac)
+	 * 		
+	 * @return result of the hash
+	 */
+	private String homeMadeHash(String msg, String type) {
+
+		String algorithm = "SHA-512" ; // Algorithm chosen for digesting
+		String data = msg + type;
+		MessageDigest md = null ;
+		try {
+			md = MessageDigest.getInstance(algorithm) ; // MessageDigest instance instantiated with SHA-512 algorithm implementation
+		} 
+		catch( NoSuchAlgorithmException nsae) {
+			System.out.println("No Such Algorithm Exception");
+		}
+		
+		byte[] hash = null ;
+		md.update(data.getBytes()) ; // Repeatedly use update method, to add all inputs to be hashed.
+		hash = md.digest() ; // Perform actual hashing
+
+		// convert bytes to bignum, then to hex string
+        BigInteger big = new BigInteger(1, hash); 
+        String hashString = big.toString(16); 
+        while (hashString.length() < 32) {  // Ensure at least 32 
+            hashString = "0" + hashString; 
+        } 
+        return hashString;
+	}
+
 	/**
 	 * Read relevant keys from files and save them in instance variables
 	 * 
-	 * For alice, we read: 1. Her private RSA key 2. Her public RSA key 3. Bob's
-	 * public RSA key
+	 * For alice, we read: 
+	 * 		1. Her private RSA key 
+	 * 		2. Her public RSA key 
+	 * 		3. Bob's public RSA key
 	 * 
 	 */
 	private void readKeys() {
