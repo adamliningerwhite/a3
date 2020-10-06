@@ -32,21 +32,21 @@ import javax.crypto.spec.SecretKeySpec;
 public class Bob {
 	
 	// Constants for RSA keys
-	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
+	private static final String BOB_PUBLIC_KEY_PATH = "bobPublic.key";
 	private static final String BOB_PRIVATE_KEY_PATH = "bobPrivate.key";
-	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
+	private static final String ALICE_PUBLIC_KEY_PATH = "alicePublic.key";
 	private static final String PUBLIC_KEY_FORMAT = "X.509";
 	private static final String PRIVATE_KEY_FORMAT = "PKCS#8";
 
 	// keys for encryption and integrity
 	private static SecretKey sharedKey;
 	private static SecretKey macKey;
-	private static SecretKey decodingKey;
+	private static SecretKey decryptionKey;
 
 	// RSA keys
 	private RSAPrivateKey bobPrivateKey;
 	private RSAPublicKey bobPublicKey;
-	private RSAPublicKey aliceKey;
+	private RSAPublicKey alicePublicKey;
 
     // instance variables      
     private boolean mac;
@@ -76,8 +76,6 @@ public class Bob {
 		// Read in RSA keys 
 		readKeys();
 
-		System.out.println("Shared key: " + keyToString(sharedKey));
-
 		//notify the identity of the server to the user
 		System.out.println("This is Bob");
 	
@@ -99,13 +97,13 @@ public class Bob {
 				try {
 					String incomingMsg = streamIn.readUTF();
 					// Split it into the message body and message number 
-					String[] pieces = incomingMsg.split(":");
-					String msg = pieces[0];
-					String msgNum = pieces[1];
+					// String[] pieces = incomingMsg.split(":");
+					// String msg = pieces[0];
+					// String msgNum = pieces[1];
 
 					System.out.println("Alice says: " + incomingMsg);
 					
-					finished = msg.equals("done");
+					finished = incomingMsg.equals("done");
 				}
 				catch(IOException ioe) {
 					//disconnect if there is an error reading the input
@@ -122,10 +120,6 @@ public class Bob {
 			System.out.println("Error in creating the server");
 			System.out.println(e);
 		}
-	}
-	
-	private String keyToString(Key k) {
-		return encoder.encodeToString(k.getEncoded());
 	}
 
 	/**

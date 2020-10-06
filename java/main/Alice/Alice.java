@@ -114,7 +114,8 @@ public class Alice {
 					line = console.nextLine();
 
 					// Package message and append message number
-					String packagedMsg = packageMessage(line + ": " + counter);
+					// String packagedMsg = packageMessage(line + ": " + counter);
+					String packagedMsg = packageMessage(line);
 
 					if (enc) {
 						packagedMsg = encrypt(packagedMsg);

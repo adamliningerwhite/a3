@@ -23,8 +23,8 @@ import javax.crypto.KeyGenerator;
 public class Mallory {
 
 	// Constants for RSA keys
-	private static String ALICE_PUBLIC_KEY_PATH = "alicePublic.pub";
-	private static String BOB_PUBLIC_KEY_PATH = "bobPublic.pub";
+	private static String ALICE_PUBLIC_KEY_PATH = "alicePublic.key";
+	private static String BOB_PUBLIC_KEY_PATH = "bobPublic.key";
 	private static String PUBLIC_KEY_FORMAT = "X.509";
 
 	//RSA keys 
@@ -81,8 +81,7 @@ public class Mallory {
             // STEP 2: CREATE A SERVER TO RECIEVE MESSAGES FROM ALICE
 			ServerSocket malloryServer = new ServerSocket(myPortNumber);
             System.out.println("Mallory Server started at port "+myPortNumber);
-            // accept the client(a.k.a. Mallory)
-			Socket clientSocket = malloryServer.accept();
+			Socket clientSocket = malloryServer.accept();	// accept the client (a.k.a. Mallory)
 			System.out.println("Alice connected");
             DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
             
@@ -92,17 +91,13 @@ public class Mallory {
 				try {
 					// Read message from Alice
 					String incomingMsg = streamIn.readUTF();
-					// Split it into the message body and message number 
-					String[] pieces = incomingMsg.split(":");
-					String msg = pieces[0];
-					String msgNum = pieces[1];
+					// Repackage this message
 					String packagedMsg = packageMessage(incomingMsg);
 
 					// Save this message 
-					// TODO: Determine which msg to save, body or whole thing
 					history.add(incomingMsg);
 
-					System.out.println("Recieved message -- " + msg + " -- from Alice");
+					System.out.println("Recieved message -- " + incomingMsg + " -- from Alice");
 					System.out.println("Commands: (1) pass message along to Bob, (2) drop the message, or (3) modify the message (send 2 copies)");
 
 					String line = console.nextLine();
@@ -125,7 +120,7 @@ public class Mallory {
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
 					}
-                    finished = msg.equals("done");
+                    finished = incomingMsg.equals("done");
 				}
 				catch(IOException ioe) {
 					//disconnect if there is an error reading the input
@@ -145,10 +140,6 @@ public class Mallory {
             System.out.println(e.getMessage());
 		}
 	}	
-
-	private String keyToString(Key k) {
-		return encoder.encodeToString(k.getEncoded());
-	}
 		
 	private void readKeys() {
 		try  {
@@ -171,14 +162,8 @@ public class Mallory {
 			X509EncodedKeySpec ks2 = new X509EncodedKeySpec(bytes);
 			alicePublicKey = kf.generatePublic(ks2);
 		}
-		catch (IOException e) {
-			System.out.println(e.getMessage());
-		} 
-		catch (NoSuchAlgorithmException e) {
-			System.out.println(e.getMessage());
-		} 
-		catch (InvalidKeySpecException e) {
-			System.out.println(e.getMessage());
+		catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
