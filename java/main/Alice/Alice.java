@@ -120,6 +120,67 @@ public class Alice {
 		}
 	}
 
+	/**
+	 * Method to encrypt messages using symmetric encryption scheme. 
+	 * 
+	 * @param str 
+	 * 		The plaintext message that we want to encrypt
+	 * 
+	 * @return cipher text for str
+	 */
+	private String encrypt(String str) {
+		String result = "";
+		try {
+			// create cipher
+			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+
+			// use initialization vector with same block length
+			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+
+			// initialize cipher 
+			cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, ivspec); 
+
+			// encrypt string 
+			byte[] strBytes = str.getBytes();
+			byte[] encryptedBytes = cipher.doFinal(strBytes);
+			String encryptedString = encoder.encodeToString(encryptedBytes);
+			
+			result = encryptedString;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
+
+	/**
+	 * Method to generate mac tag using symmetric encryption scheme 
+	 * 
+	 * @param str 
+	 * 		string for which we'll create a tag
+	 * @return
+	 * 		tag for message
+	 */
+	private String mac(String str) {
+		String result = "";
+    	try {
+			// Create and initialize Mac generator 
+			Mac mac = Mac.getInstance("HmacSHA256");
+			mac.init(macKey);
+
+			// Create tag
+			byte[] strBytes = str.getBytes();
+			byte[] macBytes = mac.doFinal(strBytes);
+			String taggedString = encoder.encodeToString(macBytes);
+			
+			result = taggedString;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+    	return result;
+	}
 
 	/**
 	 * A method to generate the message that establishes a symmetric encryption scheme
@@ -183,23 +244,6 @@ public class Alice {
 			e.printStackTrace();
 		}
 		return transferMessage;
-	}
-	
-	private String encrypt(String str) {
-		String result = "";
-		try {
-			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-		    IvParameterSpec ivspec = new IvParameterSpec(iv);
-			cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, ivspec);
-			byte[] strBytes = str.getBytes();
-			byte[] encryptedBytes = cipher.doFinal(strBytes);
-			String encryptedString = encoder.encodeToString(encryptedBytes);
-			result = encryptedString;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return result;
 	}
 
 	/**
