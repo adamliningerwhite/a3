@@ -77,10 +77,6 @@ public class Alice {
 		// Read in RSA keys
 		readKeys();
 		
-		// Generate key transfer message to establish symmetric encryption scheme
-		String keyTransferMessage = getKeyTransferMessage();
-		// System.out.println(keyTransferMessage);
-
 		Scanner console = new Scanner(System.in);
 		System.out.println("This is Alice");
 
@@ -89,21 +85,45 @@ public class Alice {
 		String serverAddress = "localhost";
 
 		try {
+			// Connect to mallory server
 			Socket serverSocket = new Socket(serverAddress, serverPort);
 			System.out.println("Connected to Server Mallory");
 			DataOutputStream streamOut = new DataOutputStream(serverSocket.getOutputStream());
 
-			// obtain the message from the user and send it to Server
-			// the communication ends when the user inputs "done"
+			// Generate key transfer message to establish symmetric encryption scheme
+			String keyTransferMessage = getKeyTransferMessage();
+			// System.out.println(keyTransferMessage);
+
+			// Send shared session key to Bob
+			streamOut.writeUTF(keyTransferMessage);
+			streamOut.flush();
+			System.out.println("Shared key en route to Bob!");
+			
+			// --------------------------------------------------------------------------
+
+			/**
+			 * obtain the message from the user and send it to server 
+			 * the communication ends when the user inputs "done"
+			 */
+			int counter = 0; 	// counter to track what message we're on
 			String line = "";
-			int counter = 0;
 			while (!line.equals("done")) {
 				try {
-					counter++;
+					counter++; 	// increment message counter
 					System.out.print("Type message: ");
 					line = console.nextLine();
 
-					String packagedMsg = packageMessage(line + ":" + counter);
+					// Package message and append message number
+					String packagedMsg = packageMessage(line + ": " + counter);
+
+					if (enc) {
+						packagedMsg = encrypt(packagedMsg);
+					} 
+					if (mac) {
+						packagedMsg += "\n" + mac(packagedMsg); 
+					}
+
+					System.out.println(packagedMsg);
 					streamOut.writeUTF(packagedMsg);
 					streamOut.flush();
 					System.out.println("Message en route to Bob");
@@ -153,7 +173,7 @@ public class Alice {
 		}
 		return result;
 	}
-
+ 
 	/**
 	 * Method to generate mac tag using symmetric encryption scheme 
 	 * 
