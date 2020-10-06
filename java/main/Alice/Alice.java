@@ -184,6 +184,23 @@ public class Alice {
 		}
 		return transferMessage;
 	}
+	
+	private String encrypt(String str) {
+		String result = "";
+		try {
+			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		    IvParameterSpec ivspec = new IvParameterSpec(iv);
+			cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, ivspec);
+			byte[] strBytes = str.getBytes();
+			byte[] encryptedBytes = cipher.doFinal(strBytes);
+			String encryptedString = encoder.encodeToString(encryptedBytes);
+			result = encryptedString;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
 
 	/**
 	 * Hashes the concatenation of parameters using SHA-512 and returns resulting String 
