@@ -10,11 +10,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Scanner;
-
+import java.text.SimpleDateFormat;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -34,11 +35,12 @@ public class Mallory {
     //instance variables
     private boolean mac;
 	private boolean enc;
-	
-	ArrayList<String> history = new ArrayList<String>();
 
     public Base64.Encoder encoder = Base64.getEncoder();
     public Base64.Decoder decoder = Base64.getDecoder();
+    
+    ArrayList<String> incomingMessages = new ArrayList<String>();
+    ArrayList<String> incomingMacs = new ArrayList<String>();
     
     public Mallory(String malloryPort, String bobPort, String config) throws Exception {
 
@@ -85,39 +87,49 @@ public class Mallory {
 			System.out.println("Alice connected");
             DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
             
+            String key = streamIn.readUTF();
+            incomingMessages.add(key);
+            incomingMacs.add("");
+            
             // STEP 3: RELAY MESSAGES FROM ALICE TO BOB
             boolean finished = false;
 			while(!finished) {
 				try {
 					// Read message from Alice
 					String incomingMsg = streamIn.readUTF();
-					// Repackage this message
-					String packagedMsg = packageMessage(incomingMsg);
-
-					// Save this message 
-					history.add(incomingMsg);
+					String macString = "";
+					if(mac) {
+						macString = streamIn.readUTF();
+					}
+					//history.add(new Pair<incoming>)
 
 					System.out.println("Recieved message -- " + incomingMsg + " -- from Alice");
+					if(mac) {
+						System.out.println("Received mac string -- " + macString + " -- from Alice");
+					}
 					System.out.println("Commands: (1) pass message along to Bob, (2) drop the message, or (3) modify the message (send 2 copies)");
 
 					String line = console.nextLine();
 					switch (line) {
 						case "1":
 							System.out.println("Passing message along to Bob");
-							streamOut.writeUTF(packagedMsg);
+							streamOut.writeUTF(incomingMsg);
+							if(mac)
+								streamOut.writeUTF(macString);
 							streamOut.flush();
 							break;
 						case "2":
 							System.out.println("Dropping message from Alice");
 							break;
 						case "3":
-							System.out.println("Message modified! I'm sending two copies instead"); 
-							streamOut.writeUTF(packagedMsg + packagedMsg);
+							System.out.println("Write new message: ");
+							incomingMsg = console.nextLine();
+							packageMessage(streamOut, incomingMsg, macString);
 							streamOut.flush();					
 							break;
 						default: 
 							System.out.println("Illegal argument! Passing the original message to Bob");
-							streamOut.writeUTF(packagedMsg);
+							streamOut.writeUTF(incomingMsg);
 							streamOut.flush();
 					}
                     finished = incomingMsg.equals("done");
@@ -166,13 +178,84 @@ public class Mallory {
 			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * Method to encrypt messages using symmetric encryption scheme. 
+	 * 
+	 * @param str 
+	 * 		The plaintext message that we want to encrypt
+	 * 
+	 * @return cipher text for str
+	 */
+	private String encrypt(String str) {
+		String result = "";
+		try {
+			// create cipher
+			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
-	private String packageMessage(String message) throws Exception {
-		StringBuilder acc = new StringBuilder();
-		acc.append(message);
-		
-		return acc.toString();
-    }
+			// use initialization vector with same block length
+			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+
+			// initialize cipher 
+			cipher.init(Cipher.ENCRYPT_MODE, bobPublicKey, ivspec); 
+
+			// encrypt string 
+			byte[] strBytes = str.getBytes();
+			byte[] encryptedBytes = cipher.doFinal(strBytes);
+			String encryptedString = encoder.encodeToString(encryptedBytes);
+			
+			result = encryptedString;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
+	
+	
+	private void packageMessage(DataOutputStream streamOut, String message, String macKey) throws IOException {
+		String newMessage = message;
+		String newMac = macKey;
+
+		if (enc) {
+			newMessage = encrypt(newMessage);
+		}
+		streamOut.writeUTF(newMessage);
+		if (mac) {
+			newMac = mac(newMessage);
+			streamOut.writeUTF(newMac);
+		} 
+	}
+	
+	
+	/**
+	 * Method to generate mac tag using symmetric encryption scheme 
+	 * 
+	 * @param str 
+	 * 		string for which we'll create a tag
+	 * @return
+	 * 		tag for message
+	 */
+	private String mac(String str) {
+		String result = "";
+    	try {
+			// Create and initialize Mac generator 
+			Mac mac = Mac.getInstance("HmacSHA256");
+			mac.init(bobPublicKey);
+
+			// Create tag
+			byte[] strBytes = str.getBytes();
+			byte[] macBytes = mac.doFinal(strBytes);
+			String taggedString = encoder.encodeToString(macBytes);
+			
+			result = taggedString;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+    	return result;
+	}
     
     /**
      * args[0] ; port Mallory will connect to (Bob's port)
