@@ -88,6 +88,7 @@ public class Mallory {
             DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
             
             String key = streamIn.readUTF();
+            streamOut.writeUTF(key);
             incomingMessages.add(key);
             incomingMacs.add("");
             
