@@ -1,11 +1,14 @@
 import java.io.*;
+import java.math.BigInteger;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Key;
@@ -28,6 +31,7 @@ import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.*;
 
 public class Bob {
 	
@@ -91,15 +95,28 @@ public class Bob {
 			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
 				
 			boolean finished = false;
+			
+			String keyResult = processTransport(streamIn.readUTF());
 				
 			//read input from Mallory
-			while(!finished) {
+			while(!finished && keyResult == "Key Received") {
 				try {
 					String incomingMsg = streamIn.readUTF();
 					// Split it into the message body and message number 
 					// String[] pieces = incomingMsg.split(":");
 					// String msg = pieces[0];
 					// String msgNum = pieces[1];
+					
+					if(mac) {
+						String mac = streamIn.readUTF();
+						boolean macRes = macCheck(incomingMsg, mac);
+						if(!macRes)
+							break;
+					}
+					
+					if(enc) {
+						incomingMsg = decrypt(incomingMsg);
+					}
 
 					System.out.println("Alice says: " + incomingMsg);
 					
@@ -173,6 +190,108 @@ public class Bob {
 			System.out.println(e.getMessage());
 		} 
 	}
+	
+	private boolean signature(String piece, String signed) throws Exception{
+		Signature sign = Signature.getInstance("SHA256withRSA");
+		sign.initVerify(alicePublicKey);
+		sign.update(piece.getBytes());
+		boolean res = sign.verify(decoder.decode(signed));
+		return res;
+	}
+	
+	/**
+	 * Hashes the concatenation of parameters using SHA-512 and returns resulting String 
+	 * 
+	 * @param msg
+	 * 		body of the message we're going to hash
+	 * @param type
+	 * 		purpose of the hash (encrpytion or mac)
+	 * 		
+	 * @return result of the hash
+	 */
+	private String homeMadeHash(String msg, String type) {
+
+		String algorithm = "SHA-512" ; // Algorithm chosen for digesting
+		String data = msg + type;
+		MessageDigest md = null ;
+		try {
+			md = MessageDigest.getInstance(algorithm) ; // MessageDigest instance instantiated with SHA-512 algorithm implementation
+		} 
+		catch( NoSuchAlgorithmException nsae) {
+			System.out.println("No Such Algorithm Exception");
+		}
+		
+		byte[] hash = null ;
+		md.update(data.getBytes()) ; // Repeatedly use update method, to add all inputs to be hashed.
+		hash = md.digest() ; // Perform actual hashing
+
+		// convert bytes to bignum, then to hex string
+        BigInteger big = new BigInteger(1, hash); 
+        String hashString = big.toString(16); 
+        while (hashString.length() < 32) {  // Ensure at least 32 
+            hashString = "0" + hashString; 
+        } 
+        return hashString;
+	}
+	
+	
+	public String decrypt(String cipher) throws Exception {
+		byte[] base = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	    IvParameterSpec ivspec = new IvParameterSpec(base);
+		Cipher newCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		newCipher.init(Cipher.DECRYPT_MODE, decryptionKey, ivspec);
+		byte[] last = newCipher.doFinal(decoder.decode(cipher));
+		String res = new String(last, "UTF-8");
+		return res;
+	}
+	
+	public static Boolean macCheck(String message, String macString) throws Exception {
+		Mac mac = Mac.getInstance("HmacSHA256");
+		mac.init(macKey);
+		byte[] bytes = message.getBytes();
+		byte[] bytesToMac = mac.doFinal(bytes);
+		String newMacString = new String(bytesToMac);
+		return macString.equals(newMacString);
+	}
+	
+	private String processTransport(String trans) throws Exception {
+		int index = trans.indexOf("\r\n")+2;
+		String signature = trans.substring(index);
+		String newTransport = trans.substring(0,trans.indexOf("\r\n"));
+		String[] transport = trans.split("\\n");
+		Date messageTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").parse(transport[1]);
+		Date currentTime = new Date(System.currentTimeMillis());
+		long convertedTime = ((currentTime.getTime() - messageTime.getTime()) / (1000 * 60)) % 60;
+		if (transport[0].equals("Bob") || transport[0].equals("bob") ) {
+			boolean isRecent = convertedTime < 2;
+			if (isRecent && signature(trans, signature)) {
+				return transportHelper(transport);
+			} else {
+				return "Done";
+			}
+		} else {
+			return "";
+		}
+	}
+	
+	private String transportHelper(String[] transport) throws Exception {
+		Cipher cipher = Cipher.getInstance("RSA");
+		cipher.init(Cipher.DECRYPT_MODE, bobPrivateKey);
+		String sessionKey = new String(cipher.doFinal(decoder.decode(transport[2])),"UTF-8");
+		String[] splitSessionKey = sessionKey.split("\\n");
+		String key = splitSessionKey[1];
+		byte[] decodedKey = decoder.decode(key);
+		SecretKeySpec sks = new SecretKeySpec(decodedKey, "AES");
+		sharedKey = sks;
+		byte[] s = decoder.decode(homeMadeHash(key, "enc"));
+		byte[] decKey = Arrays.copyOfRange(s, 0,32);
+		SecretKeySpec macSks = new SecretKeySpec(decoder.decode(homeMadeHash(key, "mac")), "AES");
+		SecretKeySpec decSks = new SecretKeySpec(decKey, "AES");
+		macKey = macSks;
+		decryptionKey = decSks;
+		return "Key Received";
+	}
+	
 
     /**
      * args[0] ; port where Bob expects connection (from Mallory)
