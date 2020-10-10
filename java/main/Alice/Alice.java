@@ -92,7 +92,7 @@ public class Alice {
 
 			// Generate key transfer message to establish symmetric encryption scheme
 			String keyTransferMessage = getKeyTransferMessage();
-			System.out.println(keyTransferMessage);
+			// System.out.println(keyTransferMessage);
 
 			// Send shared session key to Bob
 			streamOut.writeUTF(keyTransferMessage);
@@ -239,8 +239,8 @@ public class Alice {
 			/* Repeat this process to produce a key for mac */
 			String macKeyHashString = homeMadeHash(kAB, "mac");
 			byte[] macKeyBytes = decoder.decode(macKeyHashString);
-			byte[] macKey = Arrays.copyOfRange(macKeyBytes, 0, 32);
-			this.macKey = new SecretKeySpec(macKey, "AES");
+			// byte[] macKey = Arrays.copyOfRange(macKeyBytes, 0, 32);
+			this.macKey = new SecretKeySpec(macKeyBytes, "AES");
 
 			/* Build Enc(A, kAB; K_B) piece of message */
 			String toEncryptString = A + "\n" + kAB;
@@ -260,6 +260,11 @@ public class Alice {
 			String signedString = encoder.encodeToString(signedBytes);
 
 			transferMessage = B + "\n" + tA + "\n" + encryptedString + "\r\n"  + signedString;
+
+			System.out.println(kAB);
+			System.out.println(encoder.encodeToString(sharedKey.getEncoded()));
+			System.out.println(encoder.encodeToString(encryptionKey.getEncoded()));
+			System.out.println(encoder.encodeToString(this.macKey.getEncoded()));
 		}
 		catch (Exception e) {
 			e.printStackTrace();

@@ -97,9 +97,9 @@ public class Bob {
 			boolean finished = false;
 			
 			String keyTransportMessage = streamIn.readUTF();
-			System.out.println(keyTransportMessage);
+			// System.out.println(keyTransportMessage);
 			String keyResult = processTransport(keyTransportMessage);
-			System.out.println("--------------------------------------------");
+			// System.out.println("--------------------------------------------");
 			System.out.println(keyResult);
 				
 			//read input from Mallory
@@ -280,20 +280,33 @@ public class Bob {
 	}
 	
 	private String transportHelper(String[] transport) throws Exception {
+
 		Cipher cipher = Cipher.getInstance("RSA");
 		cipher.init(Cipher.DECRYPT_MODE, bobPrivateKey);
+
 		String sessionKey = new String(cipher.doFinal(decoder.decode(transport[2])),"UTF-8");
+
 		String[] splitSessionKey = sessionKey.split("\\n");
+
 		String key = splitSessionKey[1];
 		byte[] decodedKey = decoder.decode(key);
 		SecretKeySpec sks = new SecretKeySpec(decodedKey, "AES");
 		sharedKey = sks;
-		byte[] s = decoder.decode(homeMadeHash(key, "enc"));
+
+		byte[] s = decoder.decode(homeMadeHash(key, "encrypt"));
 		byte[] decKey = Arrays.copyOfRange(s, 0,32);
+
 		SecretKeySpec macSks = new SecretKeySpec(decoder.decode(homeMadeHash(key, "mac")), "AES");
 		SecretKeySpec decSks = new SecretKeySpec(decKey, "AES");
+
 		macKey = macSks;
 		decryptionKey = decSks;
+
+		System.out.println(key);
+		System.out.println(encoder.encodeToString(sharedKey.getEncoded()));
+		System.out.println(encoder.encodeToString(decryptionKey.getEncoded()));
+		System.out.println(encoder.encodeToString(macKey.getEncoded()));
+
 		return "Key Received";
 	}
 	
