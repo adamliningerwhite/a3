@@ -108,7 +108,7 @@ public class Mallory {
 					if(mac) {
 						System.out.println("Received mac string -- " + macString + " -- from Alice");
 					}
-					System.out.println("Commands: (1) pass message along to Bob, (2) drop the message, or (3) modify the message (send 2 copies)");
+					System.out.println("Commands: \n    (1) pass message along to Bob, \n    (2) drop the message, \n    (3) modify the message (send 2 copies)");
 
 					String line = console.nextLine();
 					switch (line) {

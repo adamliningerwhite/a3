@@ -121,7 +121,7 @@ public class Alice {
 						packagedMsg = encrypt(packagedMsg);
 					} 
 					if (mac) {
-						packagedMsg += "\n" + mac(packagedMsg); 
+						streamOut.writeUTF(mac(packagedMsg));
 					}
 
 					System.out.println(packagedMsg);
