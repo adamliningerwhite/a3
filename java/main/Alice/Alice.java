@@ -92,7 +92,7 @@ public class Alice {
 
 			// Generate key transfer message to establish symmetric encryption scheme
 			String keyTransferMessage = getKeyTransferMessage();
-			// System.out.println(keyTransferMessage);
+			System.out.println(keyTransferMessage);
 
 			// Send shared session key to Bob
 			streamOut.writeUTF(keyTransferMessage);
@@ -259,7 +259,7 @@ public class Alice {
 			byte[] signedBytes = signature.sign();
 			String signedString = encoder.encodeToString(signedBytes);
 
-			transferMessage = B + "\n" + tA + "\n" + encryptedString + "\n"  + signedString;
+			transferMessage = B + "\n" + tA + "\n" + encryptedString + "\r\n"  + signedString;
 		}
 		catch (Exception e) {
 			e.printStackTrace();
