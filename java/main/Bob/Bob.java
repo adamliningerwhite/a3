@@ -262,17 +262,16 @@ public class Bob {
 	private String processTransport(String trans) throws Exception {
 		int index = trans.indexOf("\r\n")+2;
 		String signature = trans.substring(index);
-		String newTransport = trans.substring(0,trans.indexOf("\n"));
-		String[] transport = trans.split("\n");
+		String newTransport = trans.substring(0,index-2);
+		String[] transport = trans.split("\\n");
 		Date messageTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").parse(transport[1]);
 		Date currentTime = new Date(System.currentTimeMillis());
 		long convertedTime = ((currentTime.getTime() - messageTime.getTime()) / (1000 * 60)) % 60;
 		if (transport[0].equals("Bob") || transport[0].equals("bob") ) {
 			boolean isRecent = convertedTime < 2;
-			if (isRecent && signature(trans, signature)) {
+			if (isRecent && signature(newTransport, signature)) {
 				return transportHelper(transport);
 			} else {
-				System.out.println(isRecent);
 				return "Done";
 			}
 		} else {
