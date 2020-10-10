@@ -263,7 +263,7 @@ public class Bob {
 		int index = trans.indexOf("\r\n")+2;
 		String signature = trans.substring(index);
 		String newTransport = trans.substring(0,index-2);
-		String[] transport = trans.split("\\n");
+		String[] transport = newTransport.split("\\n");
 		Date messageTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").parse(transport[1]);
 		Date currentTime = new Date(System.currentTimeMillis());
 		long convertedTime = ((currentTime.getTime() - messageTime.getTime()) / (1000 * 60)) % 60;
