@@ -112,10 +112,14 @@ public class Bob {
 					// String msgNum = pieces[1];
 					
 					if(mac) {
-						String mac = streamIn.readUTF();
+						String mac = incomingMsg;
+						incomingMsg = streamIn.readUTF();
+						System.out.println("Message: " + incomingMsg);
+						System.out.println("Mac: " + mac);
 						boolean macRes = macCheck(incomingMsg, mac);
-						if(!macRes)
+						if(!macRes) {
 							break;
+						}
 					}
 					
 					if(enc) {
@@ -250,12 +254,12 @@ public class Bob {
 		return res;
 	}
 	
-	public static Boolean macCheck(String message, String macString) throws Exception {
+	public Boolean macCheck(String message, String macString) throws Exception {
 		Mac mac = Mac.getInstance("HmacSHA256");
 		mac.init(macKey);
 		byte[] bytes = message.getBytes();
 		byte[] bytesToMac = mac.doFinal(bytes);
-		String newMacString = new String(bytesToMac);
+		String newMacString = encoder.encodeToString(bytesToMac);
 		return macString.equals(newMacString);
 	}
 	
