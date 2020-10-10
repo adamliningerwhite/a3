@@ -99,6 +99,8 @@ public class Bob {
 			String keyTransportMessage = streamIn.readUTF();
 			System.out.println(keyTransportMessage);
 			String keyResult = processTransport(keyTransportMessage);
+			System.out.println("--------------------------------------------");
+			System.out.println(keyResult);
 				
 			//read input from Mallory
 			while(!finished && keyResult == "Key Received") {
@@ -126,6 +128,7 @@ public class Bob {
 				}
 				catch(IOException ioe) {
 					//disconnect if there is an error reading the input
+					ioe.printStackTrace();
 					finished = true;
 				}
 			}
@@ -269,6 +272,7 @@ public class Bob {
 			if (isRecent && signature(trans, signature)) {
 				return transportHelper(transport);
 			} else {
+				System.out.println(isRecent);
 				return "Done";
 			}
 		} else {
