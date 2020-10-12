@@ -1,0 +1,34 @@
+1. Rationale 
+
+"noCrypto" : 
+no cryptographic protocols used in this configuration
+
+"enc" :
+We use the key transport protocol outlined in the assignment description to establish a shared 128-bit AES key between Alice and Bob.  When sending this key, we encrypt the message using bob's public key (for confidentiality) and sign it with Alice's private key (for integrity).  These mechanisms ensure that only Bob can obtain the actual key, and he can detect if the message was tampered with in-transit.  Alice and Bob hash this shared key to produce keys specifically for message encryption and mac tagging.  The encryption key is shortened to 32 bits, while the mac key's length is unaltered. 
+
+Under the "enc" configuration, Alice encrypts her message before sending.  She uses a block cipher with PKCS5 padding ("AES/CBC/PKCS5Padding"), initialized with the 32-bit encryption key and 16-bit initialization vector, to encrypt messages.  The cipher text produced by this encryption scheme is unreadable to Mallory, but can easily be decrypted and read by Bob. 
+
+"mac" :
+Under the "mac" configuration, Alice tags her messages before sending.  She uses the "HmacSHA256" tagging protocol, initialized with the hashed mac key, to generate these message tags.  Bob can easily use his symmetric mac key to verify these tags. 
+
+"EncThenMac" : 
+Under this protocol, Alice combines the two approaches outlined above.  First she encrypts her message, then she generates a tag for the cipher text.  This combination of protocols makes message unreadable and unmodifiable by Mallory. 
+
+--------------------------------------
+2. Specification
+
+shared key is 128-bit AES key, which is hashed using "SHA-512" digesting algorithm to produce 32-bit encryption key and unmodified mac key. 
+
+We use 1024-bit RSA keys pairs, generated with "SHA1PRNG" randomness, for Alice and Bob's public-private keys.  These are only used during the key transport protocol. 
+
+Key transport message is signed using "SHA256withRSA" and Alice's private RSA key. 
+
+--------------------------------------
+3. External Libraries
+
+Only used java.crypto and javax.crypto, no external libs.
+
+--------------------------------------
+4. Known problems 
+
+Mallory is only able to successfully modify messages in the "noCrypto" configuration. Also, we didn't implement message numbering to resist replay attacks.

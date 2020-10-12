@@ -1,0 +1,2 @@
+1. Collectively, we spent upwards of 20 hours on this assignment. 
+2. Lots of time/energy was spent building and testing pieces unrelated to cryptography or the core lessons of the assignment.  

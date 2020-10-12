@@ -1,39 +1,29 @@
 Project by Jack Bernstein & Adam Lininger-White
 
-Note to Jack
+1. Setup 
 
-Key Transfer Protocol Message: 
+Project was built and run on Macs with Java 14.
+There should be no need to install additional dependencies. 
 
-All sent as one message with different pieces separated by newline characters
-B
-tA
-Enc(A, kAB; K_B)
-Sign(B, tA, Enc(A, kAB; K_B); k_A)
+-----------------------------------------------------------------
 
-Alice's normal messages take the following form:
-   Case 1: "noCrypto" 
-      plain text 
-   Case 2: "enc"
-      cipher text 
-   Case 3: "mac"
-      plain text + "\n" + mac(plain text)
-   Case 4: "EncThenMac" 
-      cypher text + "\n" + mac(cypher text)
-      
-   * Everything is sent as one message, with newlines separating the possible pieces
+2. Usage 
 
-----------------------------------------------------------
+Steps to run programs: 
+(i) From /java/main compile and run Gen.java 
+(ii) Manuall distribute keys to /Alice /Mallory and /Bob folders as outlined in assignment specification
+(iii) From /java/main/Bob, compile and run Bob
+> javac Bob.java
+> java Bob <port1> <config>
+(iv) From /java/main/Mallory, compile and run Mallory
+> javac Mallory
+> java Mallory <port1> <port2> <config>
+(v) From /java/main/Alice, compile and run Alice 
+> javac Alice
+> java Alice <port2> <config> 
 
-To run this code:
 
-1. Compile the java code
-   > javac main/Alice.java
-   > javac main/Bob.java
 
-2. Run the server: java main/Bob <port> <config>
-   > java main/Bob 8047 noCrypto
 
-3. Run the client: java main/Alice <server_port> <config>
-   > java main/Alice 8047 noCrypto
    
 
