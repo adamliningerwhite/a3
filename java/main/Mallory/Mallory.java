@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
+import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
@@ -29,8 +30,13 @@ public class Mallory {
 	private static String PUBLIC_KEY_FORMAT = "X.509";
 
 	//RSA keys 
-	private PublicKey alicePublicKey;
-	private PublicKey bobPublicKey;
+	private RSAPublicKey alicePublicKey;
+	private RSAPublicKey bobPublicKey;
+
+	// Mallory's secret key for disrupting messages 
+	private SecretKey malKey; 
+	private SecretKey encryptionKey;
+	private SecretKey macKey;
     
     //instance variables
     private boolean mac;
@@ -38,7 +44,8 @@ public class Mallory {
 
     public Base64.Encoder encoder = Base64.getEncoder();
     public Base64.Decoder decoder = Base64.getDecoder();
-    
+	
+	// Lists to keep track of previous messages 
     ArrayList<String> incomingMessages = new ArrayList<String>();
     ArrayList<String> incomingMacs = new ArrayList<String>();
     
@@ -58,14 +65,25 @@ public class Mallory {
 			mac = true;
 			enc = true;
 		}
+
+		// Create an AES key for encryption and mac
+		KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+		keyGen.init(128, new SecureRandom());
+		malKey = keyGen.generateKey();
+		// Create encryption key
+		byte[] encryptionKeyBytes = malKey.getEncoded();
+		byte[] encryptionKeyShortBytes = Arrays.copyOfRange(encryptionKeyBytes, 0, 32);
+		encryptionKey = new SecretKeySpec(encryptionKeyShortBytes, "AES");
+		// Create mac key
+		byte[] macKeyBytes = malKey.getEncoded();
+		macKey = new SecretKeySpec(macKeyBytes, "AES");
 		
 		// Read in RSA keys 
 		readKeys();
 
-		// Check that keys are read correctly 
-		// System.out.println("Alice's Public Key: " + keyToString(alicePublicKey));
-		// System.out.println("--------------------------------------------------------");
-		// System.out.println("Bob's Public Key: " + keyToString(bobPublicKey));
+		// Initialize message history
+		incomingMessages.add("No message history to replay");
+		incomingMacs.add("No mac history to replay");
 		
 		System.out.println("This is Mallory");
 		Scanner console = new Scanner(System.in);
@@ -86,10 +104,13 @@ public class Mallory {
 			Socket clientSocket = malloryServer.accept();	// accept the client (a.k.a. Mallory)
 			System.out.println("Alice connected");
             DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-            
-            String key = streamIn.readUTF();
-            streamOut.writeUTF(key);
-            incomingMessages.add(key);
+			
+			// Read key transport 
+			String keyTransportMessage = streamIn.readUTF();
+			// Forward it to Bob
+			streamOut.writeUTF(keyTransportMessage);
+			// Save in message history 
+            incomingMessages.add(keyTransportMessage);
             incomingMacs.add("");
             
             // STEP 3: RELAY MESSAGES FROM ALICE TO BOB
@@ -100,39 +121,56 @@ public class Mallory {
 					String incomingMsg = streamIn.readUTF();
 					String macString = "";
 					if(mac) {
-						macString = streamIn.readUTF();
+						macString = incomingMsg;
+						incomingMsg = streamIn.readUTF();
 					}
-					//history.add(new Pair<incoming>)
 
-					System.out.println("Recieved message -- " + incomingMsg + " -- from Alice");
+					System.out.println("Recieved message -- " + incomingMsg);
 					if(mac) {
-						System.out.println("Received mac string -- " + macString + " -- from Alice");
+						System.out.println("Received mac string -- " + macString);
 					}
-					System.out.println("Commands: \n    (1) pass message along to Bob, \n    (2) drop the message, \n    (3) modify the message (send 2 copies)");
+					incomingMessages.add(incomingMsg);
+					incomingMacs.add(macString);
+					System.out.println("Commands: \n    (1) pass message along to Bob, \n    (2) drop the message, \n    (3) edit the message \n    (4) replay old message");
 
 					String line = console.nextLine();
 					switch (line) {
 						case "1":
 							System.out.println("Passing message along to Bob");
-							streamOut.writeUTF(incomingMsg);
 							if(mac)
 								streamOut.writeUTF(macString);
+							streamOut.writeUTF(incomingMsg);
 							streamOut.flush();
 							break;
 						case "2":
 							System.out.println("Dropping message from Alice");
 							break;
 						case "3":
-							System.out.println("Write new message: ");
-							incomingMsg = console.nextLine();
-							packageMessage(streamOut, incomingMsg, macString);
-							streamOut.flush();					
+							System.out.print("Type a new message: ");
+							String replacementMsg = console.nextLine();
+							if (enc) {
+								replacementMsg = encrypt(replacementMsg);
+							} 
+							if (mac) {
+								streamOut.writeUTF(mac(replacementMsg));
+							}
+							streamOut.writeUTF(replacementMsg);
+							streamOut.flush();		
+							System.out.println("Sending new message instead...muahahaha");		
 							break;
+						case "4":
+							if (mac) 
+								streamOut.writeUTF(incomingMacs.get(incomingMacs.size() - 2));
+							streamOut.writeUTF(incomingMessages.get(incomingMessages.size() - 2));
+							streamOut.flush();
+							System.out.println("Sending the prior message instead...muahahaha");
+							break;	
 						default: 
 							System.out.println("Illegal argument! Passing the original message to Bob");
 							streamOut.writeUTF(incomingMsg);
 							streamOut.flush();
 					}
+					System.out.println("--------------------------------------------------");
                     finished = incomingMsg.equals("done");
 				}
 				catch(IOException ioe) {
@@ -143,7 +181,6 @@ public class Mallory {
 			//clean up the connections before closing
 			malloryServer.close();
 			streamIn.close();
-			//close all the sockets and console 
 			streamOut.close();
 			serverSocket.close();
 			System.out.println("Mallory closed");
@@ -156,24 +193,25 @@ public class Mallory {
 		
 	private void readKeys() {
 		try  {
-			// GENERATE BOB'S PUBLIC KEY
-			/* Read all the public key bytes */
-			Path path = Paths.get(BOB_PUBLIC_KEY_PATH);
+		
+			/* Read all Alice's public key bytes */
+			Path path = Paths.get(ALICE_PUBLIC_KEY_PATH);
 			byte[] bytes = Files.readAllBytes(path);
 
-			/* Generate public key. */
-			X509EncodedKeySpec ks1 = new X509EncodedKeySpec(bytes);
+			/* Generate Alice's public key. */
+			X509EncodedKeySpec ksA = new X509EncodedKeySpec(bytes);
 			KeyFactory kf = KeyFactory.getInstance("RSA");
-			bobPublicKey = kf.generatePublic(ks1);
+			alicePublicKey = (RSAPublicKey) kf.generatePublic(ksA);
 
-			// GENERATE ALICE'S PUBLIC KEY
-			/* Read all the public key bytes */
-			path = Paths.get(ALICE_PUBLIC_KEY_PATH);
+			// --------------------------------------------------------------------------
+
+			/* Read all Bob's public key bytes */
+			path = Paths.get(BOB_PUBLIC_KEY_PATH);
 			bytes = Files.readAllBytes(path);
 
-			/* Generate public key. */
-			X509EncodedKeySpec ks2 = new X509EncodedKeySpec(bytes);
-			alicePublicKey = kf.generatePublic(ks2);
+			/* Generate Bob's public key. */
+			X509EncodedKeySpec ksB = new X509EncodedKeySpec(bytes);
+			bobPublicKey = (RSAPublicKey) kf.generatePublic(ksB);
 		}
 		catch (Exception e) {
 			e.printStackTrace();
@@ -199,7 +237,7 @@ public class Mallory {
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
 			// initialize cipher 
-			cipher.init(Cipher.ENCRYPT_MODE, bobPublicKey, ivspec); 
+			cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, ivspec); 
 
 			// encrypt string 
 			byte[] strBytes = str.getBytes();
@@ -243,7 +281,7 @@ public class Mallory {
     	try {
 			// Create and initialize Mac generator 
 			Mac mac = Mac.getInstance("HmacSHA256");
-			mac.init(bobPublicKey);
+			mac.init(macKey);
 
 			// Create tag
 			byte[] strBytes = str.getBytes();

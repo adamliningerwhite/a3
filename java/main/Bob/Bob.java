@@ -26,6 +26,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
@@ -93,40 +94,41 @@ public class Bob {
 			Socket clientSocket = bobServer.accept();
 			System.out.println("Mallory connected");
 			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-				
-			boolean finished = false;
 			
 			String keyTransportMessage = streamIn.readUTF();
-			// System.out.println(keyTransportMessage);
 			String keyResult = processTransport(keyTransportMessage);
-			// System.out.println("--------------------------------------------");
 			System.out.println(keyResult);
 				
 			//read input from Mallory
+			boolean finished = false;
 			while(!finished && keyResult == "Key Received") {
 				try {
+					// Read incoming message from mallory
 					String incomingMsg = streamIn.readUTF();
-					// Split it into the message body and message number 
-					// String[] pieces = incomingMsg.split(":");
-					// String msg = pieces[0];
-					// String msgNum = pieces[1];
 					
+					/* If in mac configuration, read another message and check tag */
+					boolean macRes = !mac; 
 					if(mac) {
-						String mac = incomingMsg;
-						incomingMsg = streamIn.readUTF();
-						System.out.println("Message: " + incomingMsg);
-						System.out.println("Mac: " + mac);
-						boolean macRes = macCheck(incomingMsg, mac);
-						if(!macRes) {
-							break;
+						String mac = incomingMsg; // mac is first string we read 
+						incomingMsg = streamIn.readUTF(); // actual message is 2nd string 
+						macRes = macCheck(incomingMsg, mac); // check the tag 
+						if(!macRes) {  // if given a bad tag, quit the program 
+							System.out.println("ALERT: Mac tag didn't match. Mesage integrity compromised!! ");
+							System.out.println("----------------------------------------------");
+						} else {
+							System.out.println("Mac string verified");
 						}
 					}
 					
+					/* Decrypt message (if applicable) */
 					if(enc) {
 						incomingMsg = decrypt(incomingMsg);
 					}
 
-					System.out.println("Alice says: " + incomingMsg);
+					if(macRes) {
+						System.out.println("Alice says: " + incomingMsg);
+						System.out.println("----------------------------------------------");
+					} 	
 					
 					finished = incomingMsg.equals("done");
 				}
@@ -200,11 +202,20 @@ public class Bob {
 		} 
 	}
 	
+	/**
+	 * A method to verify Alice's signature over a message 
+	 */
 	private boolean signature(String piece, String signed) throws Exception{
+		
+		// Create and initialize signature
 		Signature sign = Signature.getInstance("SHA256withRSA");
-		sign.initVerify(alicePublicKey);
+		sign.initVerify(alicePublicKey);  // Use alice's public key since we want to verify her sign
+
+		// Add data to be verified
 		sign.update(piece.getBytes());
+		// Verify that the signature matches 
 		boolean res = sign.verify(decoder.decode(signed));
+
 		return res;
 	}
 	
@@ -243,40 +254,73 @@ public class Bob {
         return hashString;
 	}
 	
-	
+	/**
+	 * A method to decode encrypted messages from Alice 
+	 */
 	public String decrypt(String cipher) throws Exception {
+
+		// Create cipher
+		Cipher newCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+
+		// use initialization vector with same block length
 		byte[] base = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	    IvParameterSpec ivspec = new IvParameterSpec(base);
-		Cipher newCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		
+		// initialize cipher
 		newCipher.init(Cipher.DECRYPT_MODE, decryptionKey, ivspec);
-		byte[] last = newCipher.doFinal(decoder.decode(cipher));
-		String res = new String(last, "UTF-8");
+		
+		// decrypt string 
+		String res = "";
+		try {
+			byte[] decryptedBytes = newCipher.doFinal(decoder.decode(cipher));
+			res = new String(decryptedBytes, "UTF-8");
+		} catch (BadPaddingException e) {
+			res = "Couldn't decrypt...I think the message was modified";
+		}
+		
 		return res;
 	}
 	
+	/**
+	 * A method to check the mac tag on messages from Alice. 
+	 * 
+	 * Verifies the integrity of messages to ensure Mallory isn't disrupting communication 
+	 */
 	public Boolean macCheck(String message, String macString) throws Exception {
+
+		// Create and initialize mac 
 		Mac mac = Mac.getInstance("HmacSHA256");
 		mac.init(macKey);
-		byte[] bytes = message.getBytes();
-		byte[] bytesToMac = mac.doFinal(bytes);
-		String newMacString = encoder.encodeToString(bytesToMac);
+
+		// generate mac string 
+		byte[] messageBytes = message.getBytes();
+		byte[] macBytes = mac.doFinal(messageBytes);
+		String newMacString = encoder.encodeToString(macBytes);
+
+		// check that the mac strings are the same
 		return macString.equals(newMacString);
 	}
-	
+
 	private String processTransport(String trans) throws Exception {
-		int index = trans.indexOf("\r\n")+2;
-		String signature = trans.substring(index);
-		String newTransport = trans.substring(0,index-2);
+
+		/* Break the message into 2 pieces */
+		int index = trans.indexOf("\r\n")+2; 
+		String signature = trans.substring(index); // Piece #1: B, tA, Enc(A,kAB; K_B)  
+		String newTransport = trans.substring(0,index-2); // Piece #2: Sign(B, tA, Enc(A,kAB; K_B); k_A) 
+
+		/*  Break B, tA, Enc(A,kAB; K_B) into its component parts */
 		String[] transport = newTransport.split("\\n");
-		Date messageTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").parse(transport[1]);
+
+		/* Verify that transport message is recent */
+		Date createdTime = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").parse(transport[1]);
 		Date currentTime = new Date(System.currentTimeMillis());
-		long convertedTime = ((currentTime.getTime() - messageTime.getTime()) / (1000 * 60)) % 60;
+		long convertedTime = ((currentTime.getTime() - createdTime.getTime()) / (1000 * 60)) % 60;
 		if (transport[0].equals("Bob") || transport[0].equals("bob") ) {
 			boolean isRecent = convertedTime < 2;
 			if (isRecent && signature(newTransport, signature)) {
-				return transportHelper(transport);
+				return transportHelper(transport); 
 			} else {
-				return "Done";
+				return "Done"; // Fail if not recent or signature doesn't match 
 			}
 		} else {
 			return "";
@@ -285,31 +329,28 @@ public class Bob {
 	
 	private String transportHelper(String[] transport) throws Exception {
 
+		// Create and initialize cipher 
 		Cipher cipher = Cipher.getInstance("RSA");
 		cipher.init(Cipher.DECRYPT_MODE, bobPrivateKey);
 
-		String sessionKey = new String(cipher.doFinal(decoder.decode(transport[2])),"UTF-8");
+		// Decode and save kAB
+		String sharedKeyString = new String(cipher.doFinal(decoder.decode(transport[2])),"UTF-8");
+		String[] splitSessionKey = sharedKeyString.split("\\n");
+		String keyEncoded = splitSessionKey[1];
+		byte[] decodedKey = decoder.decode(keyEncoded);
+		SecretKeySpec sharedKeySpec = new SecretKeySpec(decodedKey, "AES");
+		sharedKey = sharedKeySpec;
 
-		String[] splitSessionKey = sessionKey.split("\\n");
+		// Use our hash function to generate decryption key  
+		byte[] decryptionKeyHashBytes = decoder.decode(homeMadeHash(keyEncoded, "encrypt"));
+		byte[] decryptionKeyBytes = Arrays.copyOfRange(decryptionKeyHashBytes, 0,32);
+		SecretKeySpec decryptionKeySpec = new SecretKeySpec(decryptionKeyBytes, "AES");
+		decryptionKey = decryptionKeySpec;
 
-		String key = splitSessionKey[1];
-		byte[] decodedKey = decoder.decode(key);
-		SecretKeySpec sks = new SecretKeySpec(decodedKey, "AES");
-		sharedKey = sks;
-
-		byte[] s = decoder.decode(homeMadeHash(key, "encrypt"));
-		byte[] decKey = Arrays.copyOfRange(s, 0,32);
-
-		SecretKeySpec macSks = new SecretKeySpec(decoder.decode(homeMadeHash(key, "mac")), "AES");
-		SecretKeySpec decSks = new SecretKeySpec(decKey, "AES");
-
-		macKey = macSks;
-		decryptionKey = decSks;
-
-		System.out.println(key);
-		System.out.println(encoder.encodeToString(sharedKey.getEncoded()));
-		System.out.println(encoder.encodeToString(decryptionKey.getEncoded()));
-		System.out.println(encoder.encodeToString(macKey.getEncoded()));
+		// Use our hash function to generate mac verification key 
+		byte[] macKeyHashBytes = decoder.decode(homeMadeHash(keyEncoded, "mac"));
+		SecretKeySpec macKeySpec = new SecretKeySpec(macKeyHashBytes, "AES");
+		macKey = macKeySpec;
 
 		return "Key Received";
 	}
@@ -325,7 +366,6 @@ public class Bob {
 			System.out.println("Incorrect number of parameters");
 			return;
 		}
-		//Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 		
 		//create Bob
 		try {

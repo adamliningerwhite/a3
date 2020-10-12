@@ -11,10 +11,11 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.text.SimpleDateFormat;
 import java.security.spec.*;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalTime;
+
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
@@ -92,7 +93,6 @@ public class Alice {
 
 			// Generate key transfer message to establish symmetric encryption scheme
 			String keyTransferMessage = getKeyTransferMessage();
-			// System.out.println(keyTransferMessage);
 
 			// Send shared session key to Bob
 			streamOut.writeUTF(keyTransferMessage);
@@ -111,12 +111,12 @@ public class Alice {
 				try {
 					counter++; 	// increment message counter
 					System.out.print("Type message: ");
-					line = console.nextLine();
+					line = console.nextLine(); // read user's message
 
 					// Package message and append message number
-					// String packagedMsg = packageMessage(line + ": " + counter);
 					String packagedMsg = packageMessage(line);
 
+					// Apply encryption and mac tag (if applicable)
 					if (enc) {
 						packagedMsg = encrypt(packagedMsg);
 					} 
@@ -124,10 +124,11 @@ public class Alice {
 						streamOut.writeUTF(mac(packagedMsg));
 					}
 
-					System.out.println(packagedMsg);
+					// Send to Mallory
 					streamOut.writeUTF(packagedMsg);
 					streamOut.flush();
 					System.out.println("Message en route to Bob");
+					System.out.println("--------------------------------------------------");
 				} catch (IOException ioe) {
 					System.out.println("Sending error: " + ioe.getMessage());
 				}
@@ -259,12 +260,8 @@ public class Alice {
 			byte[] signedBytes = signature.sign();
 			String signedString = encoder.encodeToString(signedBytes);
 
+			// Put all the pieces together
 			transferMessage = B + "\n" + tA + "\n" + encryptedString + "\r\n"  + signedString;
-
-			System.out.println(kAB);
-			System.out.println(encoder.encodeToString(sharedKey.getEncoded()));
-			System.out.println(encoder.encodeToString(encryptionKey.getEncoded()));
-			System.out.println(encoder.encodeToString(this.macKey.getEncoded()));
 		}
 		catch (Exception e) {
 			e.printStackTrace();
@@ -376,7 +373,6 @@ public class Alice {
 		if (args.length != 2) {
 			System.out.println("Incorrect number of parameters");
 		} else {
-			//Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 			//create Alice to start communication
 			try {
 				Alice alice = new Alice(args[0], args[1]);
